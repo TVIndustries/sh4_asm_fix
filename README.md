@@ -8,5 +8,5 @@ A assembler for the SuperH4 chip in the dreamcast. Base assembler was written by
 
 # Thanks To  
 [Anotak](https://github.com/anotak) - for building, writing, and uploading base [sh4_asm](https://github.com/anotak/sh4_asm)  
-[bankbank](https://github.com/Strugglemeat) - for helping in pinpointing the issue of the branch, as well as for his knowledge and support
+[bankbank](https://github.com/Strugglemeat) - for helping in pinpointing the issue of the branch, as well as for his knowledge and support  
 [mountainmanjed](https://github.com/mountainmanjed) - for his knowledge and support  
