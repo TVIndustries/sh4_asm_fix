@@ -570,10 +570,23 @@ namespace sh4_asm
             {
                 case "ADD":
                     if (Program.check_arguments(statement, Program.ParseType.register_direct, Program.ParseType.register_direct))
+                    {
+                        
                         return Program.generate_register_register_swapped((ushort)12300, statement);
+                    }
+
+
                     if (Program.check_arguments(statement, Program.ParseType.integer_number, Program.ParseType.register_direct))
+                    {
+                        //Console.WriteLine(statement.raw_line);
+                        //Console.WriteLine("Detecting immediate.");
                         return Program.generate_immediate_register((ushort)7, statement);
-                    break;
+                    }
+                    else
+                    {
+
+                    }
+                        break;
                 case "ADDC":
                     if (Program.check_arguments(statement, Program.ParseType.register_direct, Program.ParseType.register_direct))
                         return Program.generate_register_register_swapped((ushort)12302, statement);
@@ -3165,7 +3178,6 @@ namespace sh4_asm
             token1.raw_string = stringBuilder.ToString();
             return token1;
         }
-
         private static Program.Token ReadNumber(
           char[] input_line,
           int line_number,
@@ -3176,19 +3188,41 @@ namespace sh4_asm
             Program.Token token = new Program.Token();
             StringBuilder stringBuilder = new StringBuilder();
             token.parse_type = Program.ParseType.integer_number;
-            if (index < input_line.Length - 1 && input_line[index] == '0' && (input_line[index + 1] == 'x' || input_line[index + 1] == 'x'))
+            // Console.WriteLine()
+            if (index < input_line.Length - 1 && input_line[index] == '0' &&  input_line[index + 1] == 'x')
             {
                 token.parse_type = Program.ParseType.hex_number;
                 stringBuilder.Append(input_line[index]);
                 stringBuilder.Append(input_line[index + 1]);
-                index += 2;
+                if (input_line[index + 2] == 'x' && index + 2 < input_line.Length - 1)
+                {
+                    stringBuilder.Append(input_line[index + 2]);
+                    index += 3;
+                }
+                else
+                {
+                    index += 2;
+                }
             }
             else if (index < input_line.Length - 1 && input_line[index] == '-')
             {
-                stringBuilder.Append('-');
-                ++index;
+                if ((input_line[index + 2] == 'x' && index + 2 < input_line.Length - 1))
+                { 
+                    token.parse_type = Program.ParseType.hex_number;
+                    stringBuilder.Append(input_line[index]);
+                    stringBuilder.Append(input_line[index + 1]);
+                    stringBuilder.Append(input_line[index + 2]);
+                    index += 3;
+                }
+                else
+                {
+                    stringBuilder.Append('-');
+                    ++index;
+                }
             }
+            // Console.WriteLine()
             bool flag = true;
+
             while (index < input_line.Length & flag)
             {
                 char ch = input_line[index];
@@ -3211,6 +3245,7 @@ namespace sh4_asm
                         stringBuilder.Append(ch);
                         ++index;
                         continue;
+
                     case '0':
                     case '1':
                     case '2':
@@ -3253,8 +3288,20 @@ namespace sh4_asm
                         continue;
                 }
             }
+            // token.raw_string = stringBuilder.ToString();
             token.raw_string = stringBuilder.ToString();
-            return token;
+            if (token.raw_string[0] == '-' && token.raw_string[2] == 'x')
+            {
+                //Console.WriteLine(token.raw_string);
+                token.raw_string = token.raw_string.Substring(1);
+
+                //Console.WriteLine(token.raw_string);
+                int intValue = (Convert.ToInt16(token.raw_string, 16) * -1) & 0xFF;
+                token.raw_string = "0x" + intValue.ToString("X2");
+                //Console.WriteLine(tokSen.raw_string);
+                
+            }
+        return token;
         }
 
         private static Program.Token ReadSymbolOrLabel(
