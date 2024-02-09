@@ -570,11 +570,9 @@ namespace sh4_asm
             {
                 case "ADD":
                     if (Program.check_arguments(statement, Program.ParseType.register_direct, Program.ParseType.register_direct))
-                    {
-                        
+                    {   
                         return Program.generate_register_register_swapped((ushort)12300, statement);
                     }
-
 
                     if (Program.check_arguments(statement, Program.ParseType.integer_number, Program.ParseType.register_direct))
                     {
@@ -582,11 +580,7 @@ namespace sh4_asm
                         //Console.WriteLine("Detecting immediate.");
                         return Program.generate_immediate_register((ushort)7, statement);
                     }
-                    else
-                    {
-
-                    }
-                        break;
+                    break;
                 case "ADDC":
                     if (Program.check_arguments(statement, Program.ParseType.register_direct, Program.ParseType.register_direct))
                         return Program.generate_register_register_swapped((ushort)12302, statement);
@@ -3189,36 +3183,38 @@ namespace sh4_asm
             StringBuilder stringBuilder = new StringBuilder();
             token.parse_type = Program.ParseType.integer_number;
             // Console.WriteLine()
-            if (index < input_line.Length - 1 && input_line[index] == '0' &&  input_line[index + 1] == 'x')
+            if (index < input_line.Length - 1 && input_line[index] == '0')
             {
-                token.parse_type = Program.ParseType.hex_number;
-                stringBuilder.Append(input_line[index]);
-                stringBuilder.Append(input_line[index + 1]);
-                if (input_line[index + 2] == 'x' && index + 2 < input_line.Length - 1)
+                if (input_line[index + 1] == 'x')
                 {
-                    stringBuilder.Append(input_line[index + 2]);
-                    index += 3;
-                }
-                else
-                {
+                    if (input_line.Length - 1 < 3)
+                        Program.Error(input_line, module, line_number, index, "Invalid Hex");
+                    token.parse_type = Program.ParseType.hex_number;
+                    stringBuilder.Append(input_line[index]);
+                    stringBuilder.Append(input_line[index + 1]);
                     index += 2;
+     
                 }
             }
             else if (index < input_line.Length - 1 && input_line[index] == '-')
             {
-                if ((input_line[index + 2] == 'x' && index + 2 < input_line.Length - 1))
+                if (index + 2 < input_line.Length - 1)
                 { 
-                    token.parse_type = Program.ParseType.hex_number;
-                    stringBuilder.Append(input_line[index]);
-                    stringBuilder.Append(input_line[index + 1]);
-                    stringBuilder.Append(input_line[index + 2]);
-                    index += 3;
+                    if(input_line[index + 2] == 'x')
+                    { 
+                        token.parse_type = Program.ParseType.hex_number;
+                        stringBuilder.Append(input_line[index]);
+                        stringBuilder.Append(input_line[index + 1]);
+                        stringBuilder.Append(input_line[index + 2]);
+                        index += 3;
+                    }
+                    else
+                    {
+                        stringBuilder.Append('-');
+                        ++index;
+                    }
                 }
-                else
-                {
-                    stringBuilder.Append('-');
-                    ++index;
-                }
+
             }
             // Console.WriteLine()
             bool flag = true;
@@ -3290,18 +3286,21 @@ namespace sh4_asm
             }
             // token.raw_string = stringBuilder.ToString();
             token.raw_string = stringBuilder.ToString();
-            if (token.raw_string[0] == '-' && token.raw_string[2] == 'x')
-            {
-                //Console.WriteLine(token.raw_string);
-                token.raw_string = token.raw_string.Substring(1);
+            if (token.parse_type == Program.ParseType.hex_number)
+            { 
+                if (token.raw_string[0] == '-' && token.raw_string[2] == 'x')
+                {
+                    //Console.WriteLine(token.raw_string);
+                    token.raw_string = token.raw_string.Substring(1);
 
-                //Console.WriteLine(token.raw_string);
-                int intValue = (Convert.ToInt16(token.raw_string, 16) * -1) & 0xFF;
-                token.raw_string = "0x" + intValue.ToString("X2");
-                //Console.WriteLine(tokSen.raw_string);
+                    //Console.WriteLine(token.raw_string);
+                    int intValue = (Convert.ToInt16(token.raw_string, 16) * -1) & 0xFF;
+                    token.raw_string = "0x" + intValue.ToString("X2");
+                    //Console.WriteLine(tokSen.raw_string);
                 
+                }
             }
-        return token;
+            return token;
         }
 
         private static Program.Token ReadSymbolOrLabel(
