@@ -1702,7 +1702,7 @@ namespace sh4_asm
                     }
                     else if (address > num2 )
                     {
-                        if (pcDisplacement*-1 < min_base)
+                        if (pcDisplacement < min_base)
                         {
                             num5 *= size;
                             num6 *= size;
@@ -1717,7 +1717,7 @@ namespace sh4_asm
                       Console.WriteLine("calculate_pc_displacement - pcDisplacement is:");
                       Console.WriteLine(pcDisplacement);
                     }
-                    */
+                    //*/
                 }
             }
             else if (statement.tokens[0].parse_type == Program.ParseType.absolute_displacement_address)
@@ -1765,10 +1765,10 @@ namespace sh4_asm
             if (statement.instruction == "MOV.W")
                 pcDisplacement = (short)Program.calculate_pc_displacement(statement, size, 0, 0xFF); //-256 and 254 are wrong, mixing instr/displ with bytes?
             else
-                pcDisplacement = (short)Program.calculate_pc_displacement(statement, size, -256 / 2, 254 / 2); //-256 and 254 are wrong, mixing instr/displ with bytes?
+                pcDisplacement = (short)Program.calculate_pc_displacement(statement, size, -128, 127); //-256 and 254 are wrong, mixing instr/displ with bytes?
             return (ushort)((int)insn << 8 | (int)(ushort)pcDisplacement & (int)byte.MaxValue);
         }
-
+            
         private static ushort generate_displacement8_register(
           ushort insn,
           Program.Statement statement,
