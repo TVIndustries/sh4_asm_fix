@@ -1,4 +1,4 @@
-﻿// Decompiled with JetBrains decompiler
+// Decompiled with JetBrains decompiler
 // Type: sh4_asm.Program
 // Assembly: sh4_asm, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null
 // MVID: 52066F41-EA72-4C12-B6F3-5FED11FB8217
@@ -21,11 +21,16 @@ namespace sh4_asm
         private static Dictionary<string, Program.Module> modules_loaded;
         private static string working_directory;
         private static Program.Endian endian;
+        private static Dictionary<string, long> setting_dict = new Dictionary<string, long>();
+        private static bool in_if_statement;
+        private static bool in_false_if_statement;
 
         private static void Main(string[] args)
         {
             Program.endian = Program.Endian.Little;
             Program.starting_offset = 216203264U;
+            Program.in_false_if_statement = false;
+            Program.in_if_statement = false;
             if (args.Length < 2)
             {
                 Console.WriteLine("need input filename, output filename.\nthird option is offset, is optional");
@@ -394,6 +399,53 @@ namespace sh4_asm
         {
             if (statement.instruction == "#DATA" || statement.instruction == "#DATA8" || statement.instruction == "#DATA16")
                 Program.generate_data(statement, writer);
+            // Pads to a certain value //
+            else if (statement.instruction == "#PAD_TO")
+            {
+                uint target = (uint)statement.tokens[0].value;
+                uint current = statement.address;
+                uint pad_value = 0;
+                if (current > target)
+                    Program.Error(statement.raw_line, statement.module, statement.line_number, -1, statement.instruction + " target position is before current position.");
+
+                // Optional 3rd parameter for which value is written //
+                if (statement.tokens.Count > 1)
+                {
+                    pad_value = (uint)statement.tokens[1].value;
+                }
+
+                for (; current < target; current++)
+                {
+                    writer.Write((byte)pad_value);
+                }
+            }
+            // Pads to a certain value with NOPs //
+            else if (statement.instruction == "#NOP_TO")
+            {
+                uint target = (uint)statement.tokens[0].value;
+                uint current = statement.address;
+
+                uint mod4 = current % 4;
+                if (mod4 % 2U == 1U)
+                    Program.Error(statement.raw_line, statement.module, statement.line_number, -1, statement.instruction + " must be 2-aligned already.");
+
+                if (current > target)
+                    Program.Error(statement.raw_line, statement.module, statement.line_number, -1, statement.instruction + " target position is before current position.");
+
+                for (; current < target; current += 2U)
+                {
+                    if (Program.endian == Program.Endian.Little)
+                    {
+                        writer.Write((byte)9);
+                        writer.Write((byte)0);
+                    }
+                    else
+                    {
+                        writer.Write((byte)0);
+                        writer.Write((byte)9);
+                    }
+                }
+            }
             else if (statement.instruction == "#ALIGN4" || statement.instruction == "#ALIGN16")
             {
                 uint num1 = 4;
@@ -570,7 +622,7 @@ namespace sh4_asm
             {
                 case "ADD":
                     if (Program.check_arguments(statement, Program.ParseType.register_direct, Program.ParseType.register_direct))
-                    {   
+                    {
                         return Program.generate_register_register_swapped((ushort)12300, statement);
                     }
 
@@ -1686,7 +1738,7 @@ namespace sh4_asm
                 {
 
                     //Console.WriteLine("size not 4");
-                    
+
 
                     num1 = (int)((num2 - address - 4L) % (long)size);
                     pcDisplacement = (num2 - address - 4L) / (long)size;
@@ -1700,7 +1752,7 @@ namespace sh4_asm
 
                         }
                     }
-                    else if (address > num2 )
+                    else if (address > num2)
                     {
                         if (pcDisplacement < min_base)
                         {
@@ -1768,7 +1820,7 @@ namespace sh4_asm
                 pcDisplacement = (short)Program.calculate_pc_displacement(statement, size, -128, 127); //-256 and 254 are wrong, mixing instr/displ with bytes?
             return (ushort)((int)insn << 8 | (int)(ushort)pcDisplacement & (int)byte.MaxValue);
         }
-            
+
         private static ushort generate_displacement8_register(
           ushort insn,
           Program.Statement statement,
@@ -1840,6 +1892,23 @@ namespace sh4_asm
                     while (startingOffset % 4U != 0U)
                         ++startingOffset;
                 }
+                // Figure out the offset shift for the pad values //
+                else if (statement.instruction == "#PAD_TO" || statement.instruction == "#NOP_TO")
+                {
+                    if (statement.repeat_count > 1)
+                    {
+                        statement.repeat_count = 1;
+                        Program.Warn(statement.raw_line, statement.module, statement.line_number, -1, "repeat has been applied to #PAD_TO/#NOP_TO directive");
+                    }
+                    statement.address = startingOffset;
+
+                    // Determine the value of the tokens //
+                    Program.assign_value_to_token(statement, statement.tokens[0]);
+                    uint target = (uint)statement.tokens[0].value;
+
+                    while (startingOffset < target)
+                        ++startingOffset;
+                }
                 else if (statement.instruction == "#ALIGN16" || statement.instruction == "#ALIGN16_NOP")
                 {
                     if (statement.repeat_count > 1)
@@ -1896,12 +1965,12 @@ namespace sh4_asm
                     else
                     {
                         uint address = statements[statementNumber].address;
-                        while (statementNumber < statements.Count - 1 && (statements[statementNumber].instruction == "#ALIGN4" || statements[statementNumber].instruction == "#ALIGN4_NOP" || statements[statementNumber].instruction == "#ALIGN16" || statements[statementNumber].instruction == "#ALIGN16_NOP" || statements[statementNumber].instruction == "#ALIGN"))
+                        while (statementNumber < statements.Count - 1 && (statements[statementNumber].instruction == "#ALIGN4" || statements[statementNumber].instruction == "#ALIGN4_NOP" || statements[statementNumber].instruction == "#ALIGN16" || statements[statementNumber].instruction == "#ALIGN16_NOP" || statements[statementNumber].instruction == "#ALIGN" || statements[statementNumber].instruction == "#PAD_TO" || statements[statementNumber].instruction == "#NOP_TO"))
                         {
                             ++statementNumber;
                             address = statements[statementNumber].address;
                         }
-                        if (statementNumber != symbol.statement_number && (statements[statementNumber].instruction == "#ALIGN4" || statements[statementNumber].instruction == "#ALIGN4_NOP" || statements[statementNumber].instruction == "#ALIGN16" || statements[statementNumber].instruction == "#ALIGN16_NOP" || statements[statementNumber].instruction == "#ALIGN"))
+                        if (statementNumber != symbol.statement_number && (statements[statementNumber].instruction == "#ALIGN4" || statements[statementNumber].instruction == "#ALIGN4_NOP" || statements[statementNumber].instruction == "#ALIGN16" || statements[statementNumber].instruction == "#ALIGN16_NOP" || statements[statementNumber].instruction == "#ALIGN" || statements[statementNumber].instruction == "#PAD_TO" || statements[statementNumber].instruction == "#NOP_TO"))
                         {
                             symbol.statement_number = statementNumber;
                             symbol.address = address;
@@ -1917,7 +1986,7 @@ namespace sh4_asm
             {
                 foreach (Program.Token token in statement.tokens)
                 {
-                   
+
                     try
                     {
                         Program.assign_value_to_token(statement, token);
@@ -2211,6 +2280,7 @@ namespace sh4_asm
                             Program.Symbol symbol = Program.symbol_table[key];
                             if (symbol.symbol_type == Program.SymbolType.from_symbol_directive || symbol.symbol_type == Program.SymbolType.label)
                             {
+                                num = symbol.size;
                                 current_address += num;
                                 continue;
                             }
@@ -2384,6 +2454,8 @@ namespace sh4_asm
             Program.add_builtin_symbol_alias("#D", "#DATA");
             Program.add_builtin_symbol_alias("#D8", "#DATA8");
             Program.add_builtin_symbol_alias("#D16", "#DATA16");
+            Program.add_builtin_symbol("#PAD_TO");
+            Program.add_builtin_symbol("#NOP_TO");
             Program.add_builtin_symbol("#SYMBOL");
             Program.add_builtin_symbol("#REPEAT");
             Program.add_builtin_symbol("#ALIGN4");
@@ -2609,6 +2681,68 @@ namespace sh4_asm
             while (Program.find_token(input_line, line_number, statement_number, ref index))
                 output.tokens.Add(Program.ReadArgument(input_line, line_number, statement_number, ref index, module));
             output.raw_line = input_line;
+
+            // Turn off the IF flags //
+            if (output.instruction == "#END_IF")
+            {
+                if (Program.in_if_statement)
+                {
+                    Program.in_false_if_statement = false;
+                    Program.in_if_statement = false;
+                }
+                else
+                    Program.Error(input_line, module, line_number, -1, "#END_IF Found not in #IF statement!");
+                return (Program.Statement)null;
+            }
+
+            // Else is just do the opposite //
+            if (output.instruction == "#ELSE")
+            {
+                if (Program.in_if_statement)
+                {
+                    Program.in_false_if_statement = !Program.in_false_if_statement;
+                }
+                else
+                    Program.Error(input_line, module, line_number, -1, "#ELSE Found not in #IF statement!");
+                return (Program.Statement)null;
+            }
+
+            // Do an IF check //
+            if (output.instruction == "#ELSE_IF")
+            {
+                if (Program.in_if_statement)
+                {
+                    Program.in_if_statement = false;
+
+                    // Sets the SKIP_CODE value based on the label //
+                    Program.in_false_if_statement = Program.CheckIfStatement(output, input_line, line_number, module);
+                }
+                else
+                    Program.Error(input_line, module, line_number, -1, "#ELSE_IF Found not in #IF statement!");
+                return (Program.Statement)null;
+            }
+
+            // If currently In a False If, bail //
+            if (Program.in_false_if_statement)
+            {
+                return (Program.Statement)null;
+            }
+
+            // Set a value for the IF check
+            if (output.instruction == "#SET")
+            {
+                Program.AddSetting(output, input_line, line_number, module);
+                return (Program.Statement)null;
+            }
+
+            // Do a IF / NOT_IF check //
+            if (output.instruction == "#IF")
+            {
+                // Sets the SKIP_CODE value based on the label //
+                Program.in_false_if_statement = Program.CheckIfStatement(output, input_line, line_number, module);
+                return (Program.Statement)null;
+            }
+
             if (output.instruction == "#SYMBOL")
                 Program.tokenize_symbol(input_line, line_number, statement_number, output, module);
             return output;
@@ -2894,6 +3028,190 @@ namespace sh4_asm
             string str = stringBuilder.ToString();
             token.expression.subtokens.Add(str);
             return str;
+        }
+
+        // Add a setting to the dictionary //
+        private static void AddSetting(
+            Program.Statement statement,
+              char[] input_line,
+              int line_number,
+              string module)
+        {
+            int numTokens = statement.tokens.Count;
+
+            if (numTokens != 2)
+                Program.Error(input_line, module, line_number, -1, "ADD SETTING: REQUIRES 2 TOKENS [#SET LABEL VALUE]");
+
+            string label = statement.tokens[0].raw_string.ToUpper();
+            string sValue = statement.tokens[1].raw_string.ToUpper();
+            string padding = new string(' ', label.Length < 20 ? 20-label.Length : 0);
+            long value;
+
+            // Convert the string to the value //
+            if (sValue == "TRUE")
+                value = 1;
+            // Catch the common 0 value strings //
+            else if (sValue == "FALSE" || sValue == "0" || sValue == "0X00" || sValue == "0X0")
+                value = 0;
+            else
+            {
+                // Looks like it is something else, use built in function to set value //
+                Program.assign_value_to_token(statement, statement.tokens[1]);
+                value = statement.tokens[1].value;
+
+                // Format the string for output
+                if (value > 0)
+                    sValue = $"0x{value:X2}";
+                // If value was not valueable
+                else
+                    Program.Error(input_line, module, line_number, -1, $"ADD SETTING ERROR: Invalid value '{sValue}' [Use: 'True', 'False', or hex values]!");
+            }
+
+            // Check for updates //
+            if (setting_dict.ContainsKey(label))
+            {
+                if (setting_dict[label] != value)
+                {
+                    setting_dict[label] = value;
+                    System.Console.WriteLine($"UPDATE SETTING: {label}{padding} VALUE: {sValue}");
+                }
+            }
+            else
+            {
+                setting_dict.Add(label, value);
+                System.Console.WriteLine($" USING SETTING: {label}{padding} VALUE: {sValue}");
+            }
+
+            return;
+        }
+
+        // Check if the IF/NOT_IF value is set, returns the value for the 'in_false_if_statement' program flag //
+        // Should be in this format #IF [#AND/#OR/#NOT] LABEL_1 LABEL_2 0x03 LABEL_3 ...
+        private static bool CheckIfStatement(
+            Program.Statement statement,
+              char[] input_line,
+              int line_number,
+              string module)
+        {
+            int x;
+            string label;
+            string line = new string(statement.raw_line);
+            int numTokens = statement.tokens.Count;
+            bool orCheck = false;
+            bool andCheck = false;
+            bool notCheck = false;
+            bool thisCheck = false;
+            int settingsFound = 0;
+            string nextLabel;
+
+            // Check if we are current in an IF //
+            if (Program.in_if_statement)
+                Program.Error(input_line, module, line_number, -1, "CHECK IF: NESTED IF STATEMENTS ARE NOT SUPPORTED");
+
+            if (numTokens == 0)
+                Program.Error(input_line, module, line_number, -1, "CHECK IF: MISSING TOKEN");
+
+            // Prevent nested IFs //
+            Program.in_if_statement = true;
+
+            for (x = 0; x < numTokens; x++)
+            {
+                label = statement.tokens[x].raw_string.ToUpper();
+
+                if (label == "#NOT")
+                    notCheck = true;
+                else if (label == "#AND")
+                    andCheck = true;
+                else if (label == "#OR")
+                    orCheck = true;
+                else if (Program.setting_dict.ContainsKey(label))
+                    settingsFound++;
+            }
+
+            if (orCheck && andCheck)
+                Program.Error(input_line, module, line_number, -1, "CHECK IF: #AND not compatible with #OR");
+
+            if (settingsFound == 0)
+                Program.Error(input_line, module, line_number, -1, $"CHECK IF: No settings found in line '{line}'");
+
+
+            // System.Console.WriteLine($"LINE: {line} ({statement.raw_line.Length}) token:{numTokens} settings: {settingsFound} not:{notCheck} and:{andCheck} or:{orCheck}");
+            for (x = 0; x < numTokens; x++)
+            {
+                // Get the label //
+                label = statement.tokens[x].raw_string.ToUpper();
+
+                // Skip special tokens //
+                if (label == "#NOT" || label == "#AND" || label == "#OR")
+                    continue;
+
+                //System.Console.WriteLine($"   x:{x} : {label}");
+
+                if (Program.setting_dict.ContainsKey(label))
+                {
+                    if (numTokens > x + 1)
+                    {
+                        nextLabel = statement.tokens[x + 1].raw_string.ToUpper();
+
+                        // Next token is setting, eval this token as bool
+                        if (Program.setting_dict.ContainsKey(nextLabel))
+                        {
+                            if (setting_dict[label] == 1)
+                                thisCheck = true;
+                            else if (setting_dict[label] == 0)
+                                thisCheck = false;
+                            else
+                                Program.Error(input_line, module, line_number, -1, $"IF CHECK: {label} not True/False {setting_dict[label]} (1)");
+                        }
+                        else
+                        {
+                            // Eval the next token //
+                            Program.assign_value_to_token(statement, statement.tokens[x + 1]);
+                            thisCheck = statement.tokens[x + 1].value == setting_dict[label];
+
+                            // Skip the next token since it was evaluated already //
+                            x++;
+                        }
+                    }
+                    // Last token, eval this as normal
+                    else
+                    {
+                        if (setting_dict[label] == 1)
+                            thisCheck = true;
+                        else if (setting_dict[label] == 0)
+                            thisCheck = false;
+                        else
+                            Program.Error(input_line, module, line_number, -1, $"IF CHECK: {label} not True/False {setting_dict[label]} (2)");
+                    }
+
+                    // Only doing one check //
+                    if (!orCheck && !andCheck)
+                    {
+                        return (notCheck ? thisCheck : !thisCheck);
+                    }
+                    // Any True OR check, leave //
+                    else if (orCheck && thisCheck)
+                    {
+                        return notCheck;
+                    }
+                    // And False AND check, leave //
+                    else if (andCheck && !thisCheck)
+                    {
+                        return !notCheck;
+                    }
+                }
+                else
+                    Program.Error(input_line, module, line_number, -1, $"IF CHECK: {label} NOT 'SET'");
+            }
+
+            // If we got here NONE of the ORs were found - Turn flag off //
+            if (orCheck)
+                thisCheck = false;
+            // Or none of the AND checks were false - Turn flag on //
+            else
+                thisCheck = true;
+
+            return (notCheck ? thisCheck : !thisCheck);
         }
 
         private static Program.Token ReadString(
@@ -3193,15 +3511,15 @@ namespace sh4_asm
                     stringBuilder.Append(input_line[index]);
                     stringBuilder.Append(input_line[index + 1]);
                     index += 2;
-     
+
                 }
             }
             else if (index < input_line.Length - 1 && input_line[index] == '-')
             {
                 if (index + 2 < input_line.Length - 1)
-                { 
-                    if(input_line[index + 2] == 'x')
-                    { 
+                {
+                    if (input_line[index + 2] == 'x')
+                    {
                         token.parse_type = Program.ParseType.hex_number;
                         stringBuilder.Append(input_line[index]);
                         stringBuilder.Append(input_line[index + 1]);
@@ -3287,7 +3605,7 @@ namespace sh4_asm
             // token.raw_string = stringBuilder.ToString();
             token.raw_string = stringBuilder.ToString();
             if (token.parse_type == Program.ParseType.hex_number)
-            { 
+            {
                 if (token.raw_string[0] == '-' && token.raw_string[2] == 'x')
                 {
                     //Console.WriteLine(token.raw_string);
@@ -3297,7 +3615,7 @@ namespace sh4_asm
                     int intValue = (Convert.ToInt16(token.raw_string, 16) * -1) & 0xFF;
                     token.raw_string = "0x" + intValue.ToString("X2");
                     //Console.WriteLine(tokSen.raw_string);
-                
+
                 }
             }
             return token;
@@ -3315,7 +3633,12 @@ namespace sh4_asm
             {
                 if (token.parse_type != Program.ParseType.name)
                     Program.Error(input_line, module, line_number, index, "Invalid label \"" + token.raw_string + "\"");
-                Program.add_symbol(token.raw_string, (long)statement_number, Program.SymbolType.label, input_line, line_number, index, statement_number, 4U, module);
+
+                // Don't add the symbol if we are are skip mode //
+                if (!Program.in_false_if_statement)
+                {
+                    Program.add_symbol(token.raw_string, (long)statement_number, Program.SymbolType.label, input_line, line_number, index, statement_number, 4U, module);
+                }
                 ++index;
                 token.parse_type = Program.ParseType.label_declaration;
                 token.raw_string += ":";
