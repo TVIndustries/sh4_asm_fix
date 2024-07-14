@@ -3140,7 +3140,7 @@ namespace sh4_asm
                 Program.Error(input_line, module, line_number, -1, "CHECK IF: MISSING TOKEN");
 
 
-            bool check = false;
+            Program.in_if_statement = true;
             for (x = 0; x < numTokens; x++)
             {
                 label = statement.tokens[x].raw_string.ToUpper();
