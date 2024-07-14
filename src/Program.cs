@@ -567,8 +567,8 @@ namespace sh4_asm
                         {
                             case 1:
                                 writer.Write((byte)token.value);
-                                if (statement.address > 0x8c140500 && 0x8c140800 > statement.address)
-                                    Console.WriteLine($"[i] {token.raw_string}: {token.value:X08}, {statement.address:X08}, {token.size}");
+                                //if (statement.address > 0x8c140500 && 0x8c140800 > statement.address)
+                                //    Console.WriteLine($"[i] {token.raw_string}: {token.value:X08}, {statement.address:X08}, {token.size}");
                                 break;
                             case 2:
                                 writer.Write((short)token.value);
@@ -590,8 +590,8 @@ namespace sh4_asm
                         {
                             case 1:
                                 writer.Write((byte)token.value);
-                                if (statement.address > 0x8c140500 && 0x8c140800 > statement.address)
-                                    Console.WriteLine($"[i] {token.raw_string}: {token.value:X08}, {token.value:X08}, {token.size}");
+                                //if (statement.address > 0x8c140500 && 0x8c140800 > statement.address)
+                                //    Console.WriteLine($"[i] {token.raw_string}: {token.value:X08}, {token.value:X08}, {token.size}");
                                 break;
                             case 2:
                                 ushort num1 = (ushort)token.value;
@@ -1987,8 +1987,8 @@ namespace sh4_asm
                         {
                             ++statementNumber;
                             address = statements[statementNumber].address;
-                            if (address > 0x8c140500 && 0x8c140800 > address)
-                                Console.WriteLine($"[i] {address:X08}");
+                            //if (address > 0x8c140500 && 0x8c140800 > address)
+                            //    Console.WriteLine($"[i] {address:X08}");
                         }
                         if (statementNumber != symbol.statement_number && (statements[statementNumber].instruction == "#ALIGN4" || statements[statementNumber].instruction == "#ALIGN4_NOP" || statements[statementNumber].instruction == "#ALIGN16" || statements[statementNumber].instruction == "#ALIGN16_NOP" || statements[statementNumber].instruction == "#ALIGN" || statements[statementNumber].instruction == "#PAD_TO" || statements[statementNumber].instruction == "#NOP_TO"))
                         {
@@ -2035,8 +2035,8 @@ namespace sh4_asm
                 case Program.ParseType.name:
                     Program.Symbol symbol = Program.resolve_name(statement, token.raw_string);
                     token.value = symbol.value;
-                    if (statement.address > 0x8c140500 && 0x8c140800 > statement.address)
-                        Console.WriteLine($"[i] {token.raw_string}: {token.value:X08}, {token.value:X08}, {symbol.size}, {statement.address:X08}");
+                    //if (statement.address > 0x8c140500 && 0x8c140800 > statement.address)
+                    //    Console.WriteLine($"[i] {token.raw_string}: {token.value:X08}, {token.value:X08}, {symbol.size}, {statement.address:X08}");
                     token.size = Math.Min(symbol.size, val2);
                     token.is_value_assigned = true;
                     break;
