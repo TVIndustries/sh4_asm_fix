@@ -9,7 +9,6 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Reflection.Emit;
 using System.Text;
 
 namespace sh4_asm
@@ -1948,19 +1947,6 @@ namespace sh4_asm
                     else
                         Program.Error(statement.raw_line, statement.module, statement.line_number, -1, "too many parameters to #repeat directive");
                 }
-                /*//////  <NEW CODE>  //////
-                else if (statement.instruction == "#SYMBOL")
-                {
-                    uint size = 4U;
-
-                    if (statement.tokens[1].parse_type == Program.ParseType.hex_number)
-                    {
-                        size = (uint)(statement.tokens[1].raw_string.Length - 2) / 2U;
-                    }
-
-                    startingOffset += size;
-                }
-                //////  </ NEW CODE>  //////*/
                 else if (statement.instruction == "#IMPORT_RAW_DATA")
                     Program.process_import_raw_data(statement, ref startingOffset);
                 else if (!(statement.instruction == "#LITTLE_ENDIAN") && !(statement.instruction == "#BIG_ENDIAN") && statement.instruction != "#SYMBOL")
@@ -2285,7 +2271,6 @@ namespace sh4_asm
         {
             statement.address = current_address;
             uint num = 4;
-
             if (statement.instruction == "#DATA16")
                 num = 2U;
             else if (statement.instruction == "#DATA8")
@@ -2582,7 +2567,7 @@ namespace sh4_asm
         private static void add_builtin_symbol(string name)
         {
             name = name.ToUpperInvariant();
-            Program.Symbol symbol = new Symbol();
+            Program.Symbol symbol = new Program.Symbol();
             symbol.symbol_type = Program.SymbolType.builtin;
             symbol.name = name;
             symbol.line_number = -1;
@@ -2762,25 +2747,6 @@ namespace sh4_asm
                 }
                 else
                     Program.Error(input_line, module, line_number, -1, "#ELSE_IF Found not in #IF statement!");
-                Program.in_false_if_statement = false;
-                Program.in_if_statement = false;
-                return (Program.Statement)null;
-            }
-
-            // Else is just do the opposite // 
-            if (output.instruction == "#ELSE")
-            {
-                Program.in_false_if_statement = !Program.in_false_if_statement;
-                return (Program.Statement)null;
-            }
-
-            // Do a IF / NOT_IF check //
-            if (output.instruction == "#ELSE_IF")
-            {
-                Program.in_if_statement = false;
-                // Sets the SKIP_CODE value based on the label //
-                Program.in_false_if_statement = Program.check_setting(output, input_line, line_number, module);
-
                 return (Program.Statement)null;
             }
 
@@ -3127,7 +3093,6 @@ namespace sh4_asm
                 // If value was not valueable
                 else
                     Program.Error(input_line, module, line_number, -1, $"ADD SETTING ERROR: Invalid value '{sValue}' [Use: 'True', 'False', or hex values]!");
-
             }
 
             // Check for updates //
@@ -3176,9 +3141,6 @@ namespace sh4_asm
 
 
             bool check = false;
-            // Check if we are current in an IF //
-            if (Program.in_if_statement)
-                Program.Error(input_line, module, line_number, -1, "CHECK SETTING: NESTED IF STATEMENTS ARE NOT SUPPORTED");
             for (x = 0; x < numTokens; x++)
             {
                 label = statement.tokens[x].raw_string.ToUpper();
