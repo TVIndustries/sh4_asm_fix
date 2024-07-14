@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Reflection.Emit;
 using System.Text;
 
 namespace sh4_asm
@@ -566,6 +567,8 @@ namespace sh4_asm
                         {
                             case 1:
                                 writer.Write((byte)token.value);
+                                if (statement.address > 0x8c140500 && 0x8c140800 > statement.address)
+                                    Console.WriteLine($"[i] {token.raw_string}: {token.value:X08}, {statement.address:X08}, {token.size}");
                                 break;
                             case 2:
                                 writer.Write((short)token.value);
@@ -587,6 +590,8 @@ namespace sh4_asm
                         {
                             case 1:
                                 writer.Write((byte)token.value);
+                                if (statement.address > 0x8c140500 && 0x8c140800 > statement.address)
+                                    Console.WriteLine($"[i] {token.raw_string}: {token.value:X08}, {token.value:X08}, {token.size}");
                                 break;
                             case 2:
                                 ushort num1 = (ushort)token.value;
@@ -1943,6 +1948,19 @@ namespace sh4_asm
                     else
                         Program.Error(statement.raw_line, statement.module, statement.line_number, -1, "too many parameters to #repeat directive");
                 }
+                /*//////  <NEW CODE>  //////
+                else if (statement.instruction == "#SYMBOL")
+                {
+                    uint size = 4U;
+
+                    if (statement.tokens[1].parse_type == Program.ParseType.hex_number)
+                    {
+                        size = (uint)(statement.tokens[1].raw_string.Length - 2) / 2U;
+                    }
+
+                    startingOffset += size;
+                }
+                //////  </ NEW CODE>  //////*/
                 else if (statement.instruction == "#IMPORT_RAW_DATA")
                     Program.process_import_raw_data(statement, ref startingOffset);
                 else if (!(statement.instruction == "#LITTLE_ENDIAN") && !(statement.instruction == "#BIG_ENDIAN") && statement.instruction != "#SYMBOL")
@@ -1969,6 +1987,8 @@ namespace sh4_asm
                         {
                             ++statementNumber;
                             address = statements[statementNumber].address;
+                            if (address > 0x8c140500 && 0x8c140800 > address)
+                                Console.WriteLine($"[i] {address:X08}");
                         }
                         if (statementNumber != symbol.statement_number && (statements[statementNumber].instruction == "#ALIGN4" || statements[statementNumber].instruction == "#ALIGN4_NOP" || statements[statementNumber].instruction == "#ALIGN16" || statements[statementNumber].instruction == "#ALIGN16_NOP" || statements[statementNumber].instruction == "#ALIGN" || statements[statementNumber].instruction == "#PAD_TO" || statements[statementNumber].instruction == "#NOP_TO"))
                         {
@@ -2015,6 +2035,8 @@ namespace sh4_asm
                 case Program.ParseType.name:
                     Program.Symbol symbol = Program.resolve_name(statement, token.raw_string);
                     token.value = symbol.value;
+                    if (statement.address > 0x8c140500 && 0x8c140800 > statement.address)
+                        Console.WriteLine($"[i] {token.raw_string}: {token.value:X08}, {token.value:X08}, {symbol.size}, {statement.address:X08}");
                     token.size = Math.Min(symbol.size, val2);
                     token.is_value_assigned = true;
                     break;
@@ -2263,6 +2285,7 @@ namespace sh4_asm
         {
             statement.address = current_address;
             uint num = 4;
+
             if (statement.instruction == "#DATA16")
                 num = 2U;
             else if (statement.instruction == "#DATA8")
@@ -2281,6 +2304,26 @@ namespace sh4_asm
                             if (symbol.symbol_type == Program.SymbolType.from_symbol_directive || symbol.symbol_type == Program.SymbolType.label)
                             {
                                 num = symbol.size;
+
+                                if (statement.instruction == "#DATA16")
+                                {
+                                    num = 2U;
+                                }
+                                else if (statement.instruction == "#DATA8")
+                                {
+                                    num = 1U;
+                                    
+                                }
+                                else
+                                { 
+                                    num = symbol.size;
+
+                                    //if (current_address > 0x8c140500 && 0x8c140800 > current_address)
+                                      //  Console.WriteLine($"[i] {current_address:X08} {statement.instruction} {statement.address:X08}");
+
+                                    //if (current_address > 0x8c140500 && 0x8c140800 > current_address)
+                                      //  Console.WriteLine($"[i] {current_address:X08} {statement.instruction} {statement.address:X08}\n");
+                                }
                                 current_address += num;
                                 continue;
                             }
@@ -2539,7 +2582,7 @@ namespace sh4_asm
         private static void add_builtin_symbol(string name)
         {
             name = name.ToUpperInvariant();
-            Program.Symbol symbol = new Program.Symbol();
+            Program.Symbol symbol = new Symbol();
             symbol.symbol_type = Program.SymbolType.builtin;
             symbol.name = name;
             symbol.line_number = -1;
@@ -2715,10 +2758,29 @@ namespace sh4_asm
                     Program.in_if_statement = false;
 
                     // Sets the SKIP_CODE value based on the label //
-                    Program.in_false_if_statement = Program.CheckIfStatement(output, input_line, line_number, module);
+                    Program.in_false_if_statement = Program.check_setting(output, input_line, line_number, module);
                 }
                 else
                     Program.Error(input_line, module, line_number, -1, "#ELSE_IF Found not in #IF statement!");
+                Program.in_false_if_statement = false;
+                Program.in_if_statement = false;
+                return (Program.Statement)null;
+            }
+
+            // Else is just do the opposite // 
+            if (output.instruction == "#ELSE")
+            {
+                Program.in_false_if_statement = !Program.in_false_if_statement;
+                return (Program.Statement)null;
+            }
+
+            // Do a IF / NOT_IF check //
+            if (output.instruction == "#ELSE_IF")
+            {
+                Program.in_if_statement = false;
+                // Sets the SKIP_CODE value based on the label //
+                Program.in_false_if_statement = Program.check_setting(output, input_line, line_number, module);
+
                 return (Program.Statement)null;
             }
 
@@ -2736,10 +2798,10 @@ namespace sh4_asm
             }
 
             // Do a IF / NOT_IF check //
-            if (output.instruction == "#IF")
+            if (output.instruction == "#IF" || output.instruction == "#NOT_IF")
             {
                 // Sets the SKIP_CODE value based on the label //
-                Program.in_false_if_statement = Program.CheckIfStatement(output, input_line, line_number, module);
+                Program.in_false_if_statement = Program.check_setting(output, input_line, line_number, module);
                 return (Program.Statement)null;
             }
 
@@ -3065,6 +3127,7 @@ namespace sh4_asm
                 // If value was not valueable
                 else
                     Program.Error(input_line, module, line_number, -1, $"ADD SETTING ERROR: Invalid value '{sValue}' [Use: 'True', 'False', or hex values]!");
+
             }
 
             // Check for updates //
@@ -3073,13 +3136,13 @@ namespace sh4_asm
                 if (setting_dict[label] != value)
                 {
                     setting_dict[label] = value;
-                    System.Console.WriteLine($"UPDATE SETTING: {label}{padding} VALUE: {sValue}");
+                    System.Console.WriteLine($"[u] UPDATING SETTING: {label}\n +-------> [v] VALUE: {value}\n");
                 }
             }
             else
             {
                 setting_dict.Add(label, value);
-                System.Console.WriteLine($" USING SETTING: {label}{padding} VALUE: {sValue}");
+                System.Console.WriteLine($"[s] USING SETTING: {label}\n +----> [v] VALUE: {value}\n");
             }
 
             return;
@@ -3087,7 +3150,7 @@ namespace sh4_asm
 
         // Check if the IF/NOT_IF value is set, returns the value for the 'in_false_if_statement' program flag //
         // Should be in this format #IF [#AND/#OR/#NOT] LABEL_1 LABEL_2 0x03 LABEL_3 ...
-        private static bool CheckIfStatement(
+        private static bool check_setting(
             Program.Statement statement,
               char[] input_line,
               int line_number,
@@ -3111,9 +3174,11 @@ namespace sh4_asm
             if (numTokens == 0)
                 Program.Error(input_line, module, line_number, -1, "CHECK IF: MISSING TOKEN");
 
-            // Prevent nested IFs //
-            Program.in_if_statement = true;
 
+            bool check = false;
+            // Check if we are current in an IF //
+            if (Program.in_if_statement)
+                Program.Error(input_line, module, line_number, -1, "CHECK SETTING: NESTED IF STATEMENTS ARE NOT SUPPORTED");
             for (x = 0; x < numTokens; x++)
             {
                 label = statement.tokens[x].raw_string.ToUpper();
