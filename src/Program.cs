@@ -1,4 +1,4 @@
-// Decompiled with JetBrains decompiler
+﻿// Decompiled with JetBrains decompiler
 // Type: sh4_asm.Program
 // Assembly: sh4_asm, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null
 // MVID: 52066F41-EA72-4C12-B6F3-5FED11FB8217
@@ -22,15 +22,14 @@ namespace sh4_asm
         private static string working_directory;
         private static Program.Endian endian;
         private static Dictionary<string, long> setting_dict = new Dictionary<string, long>();
-        private static bool in_if_statement;
-        private static bool in_false_if_statement;
+        private static Program.IfStatus if_status;
 
         private static void Main(string[] args)
         {
             Program.endian = Program.Endian.Little;
+            Program.if_status = Program.IfStatus.not_in_if_block;
             Program.starting_offset = 216203264U;
-            Program.in_false_if_statement = false;
-            Program.in_if_statement = false;
+
             if (args.Length < 2)
             {
                 Console.WriteLine("need input filename, output filename.\nthird option is offset, is optional");
@@ -259,11 +258,11 @@ namespace sh4_asm
                     break;
                 case "BRA":
                     if (Program.check_arguments(statement, Program.ParseType.absolute_displacement_address))
-                        return (long)(Program.calculate_pc_displacement(statement, 2, -2048, 2047) * 2) + (long)statement.address + 4L;
+                        return (long)(Program.calculate_pc_displacement(statement, 2, -4096, 4094) * 2) + (long)statement.address + 4L;
                     break;
                 case "BSR":
                     if (Program.check_arguments(statement, Program.ParseType.absolute_displacement_address))
-                        return (long)(Program.calculate_pc_displacement(statement, 2, -2048, 2047) * 2) + (long)statement.address + 4L;
+                        return (long)(Program.calculate_pc_displacement(statement, 2, -4096, 4094) * 2) + (long)statement.address + 4L;
                     break;
                 case "BT":
                     if (Program.check_arguments(statement, Program.ParseType.absolute_displacement_address))
@@ -566,8 +565,6 @@ namespace sh4_asm
                         {
                             case 1:
                                 writer.Write((byte)token.value);
-                                //if (statement.address > 0x8c140500 && 0x8c140800 > statement.address)
-                                //    Console.WriteLine($"[i] {token.raw_string}: {token.value:X08}, {statement.address:X08}, {token.size}");
                                 break;
                             case 2:
                                 writer.Write((short)token.value);
@@ -589,8 +586,6 @@ namespace sh4_asm
                         {
                             case 1:
                                 writer.Write((byte)token.value);
-                                //if (statement.address > 0x8c140500 && 0x8c140800 > statement.address)
-                                //    Console.WriteLine($"[i] {token.raw_string}: {token.value:X08}, {token.value:X08}, {token.size}");
                                 break;
                             case 2:
                                 ushort num1 = (ushort)token.value;
@@ -1762,7 +1757,7 @@ namespace sh4_asm
                         {
                             num5 *= size;
                             num6 *= size;
-                            Program.Error(statement.raw_line, statement.module, statement.line_number, -1, "displacement argument \"" + (object)(short)(pcDisplacement * 2) + "\"  for " + statement.instruction + " too far, can only be between " + (object)num6 + " or +" + (object)num5 + " bytes away.\n Calculated displacement: " + (object)pcDisplacement + "\n [i] Max backward distance: " + (object)min_base);
+                            Program.Error(statement.raw_line, statement.module, statement.line_number, -1, "displacement argument \"" + (object)(short)statement.tokens[0].value + "\"  for " + statement.instruction + " too far, can only be between " + (object)num6 + " or +" + (object)num5 + " bytes away.\n Calculated displacement: " + (object)pcDisplacement);
 
                         }
                     }
@@ -1839,8 +1834,8 @@ namespace sh4_asm
           Program.Statement statement,
           int size = 2)
         {
-            int pcDisplacement = Program.calculate_pc_displacement(statement, size, -2048, 2047);
-            return (ushort)((int)insn << 12 | (int)(pcDisplacement & 0x00FFFFFF));
+            int pcDisplacement = Program.calculate_pc_displacement(statement, size, -4096, 4094);
+            return (ushort)((int)insn << 12 | (int)(ushort)pcDisplacement & 4095);
         }
 
         private static ushort generate_fv_register_register(ushort insn, Program.Statement statement)
@@ -1973,8 +1968,6 @@ namespace sh4_asm
                         {
                             ++statementNumber;
                             address = statements[statementNumber].address;
-                            //if (address > 0x8c140500 && 0x8c140800 > address)
-                            //    Console.WriteLine($"[i] {address:X08}");
                         }
                         if (statementNumber != symbol.statement_number && (statements[statementNumber].instruction == "#ALIGN4" || statements[statementNumber].instruction == "#ALIGN4_NOP" || statements[statementNumber].instruction == "#ALIGN16" || statements[statementNumber].instruction == "#ALIGN16_NOP" || statements[statementNumber].instruction == "#ALIGN" || statements[statementNumber].instruction == "#PAD_TO" || statements[statementNumber].instruction == "#NOP_TO"))
                         {
@@ -2021,8 +2014,6 @@ namespace sh4_asm
                 case Program.ParseType.name:
                     Program.Symbol symbol = Program.resolve_name(statement, token.raw_string);
                     token.value = symbol.value;
-                    //if (statement.address > 0x8c140500 && 0x8c140800 > statement.address)
-                    //    Console.WriteLine($"[i] {token.raw_string}: {token.value:X08}, {token.value:X08}, {symbol.size}, {statement.address:X08}");
                     token.size = Math.Min(symbol.size, val2);
                     token.is_value_assigned = true;
                     break;
@@ -2289,26 +2280,6 @@ namespace sh4_asm
                             if (symbol.symbol_type == Program.SymbolType.from_symbol_directive || symbol.symbol_type == Program.SymbolType.label)
                             {
                                 num = symbol.size;
-
-                                if (statement.instruction == "#DATA16")
-                                {
-                                    num = 2U;
-                                }
-                                else if (statement.instruction == "#DATA8")
-                                {
-                                    num = 1U;
-                                    
-                                }
-                                else
-                                { 
-                                    num = symbol.size;
-
-                                    //if (current_address > 0x8c140500 && 0x8c140800 > current_address)
-                                      //  Console.WriteLine($"[i] {current_address:X08} {statement.instruction} {statement.address:X08}");
-
-                                    //if (current_address > 0x8c140500 && 0x8c140800 > current_address)
-                                      //  Console.WriteLine($"[i] {current_address:X08} {statement.instruction} {statement.address:X08}\n");
-                                }
                                 current_address += num;
                                 continue;
                             }
@@ -2710,48 +2681,90 @@ namespace sh4_asm
                 output.tokens.Add(Program.ReadArgument(input_line, line_number, statement_number, ref index, module));
             output.raw_line = input_line;
 
-            // Turn off the IF flags //
-            if (output.instruction == "#END_IF")
+            // #IF check //
+            if (output.instruction == "#IF")
             {
-                if (Program.in_if_statement)
+                if (Program.if_status != Program.IfStatus.not_in_if_block)
                 {
-                    Program.in_false_if_statement = false;
-                    Program.in_if_statement = false;
+                    Program.Error(input_line, module, line_number, -1, output.instruction + " statement unexepcted at this time!  Nested IF statements are not supported!");
                 }
+
+                // Sets the if_status value based on the label //
+                if (Program.CheckIfStatement(output, input_line, line_number, module))
+                    Program.if_status = Program.IfStatus.in_false_if_statement;
                 else
-                    Program.Error(input_line, module, line_number, -1, "#END_IF Found not in #IF statement!");
+                    Program.if_status = Program.IfStatus.in_true_if_statement;
+
                 return (Program.Statement)null;
             }
 
-            // Else is just do the opposite //
-            if (output.instruction == "#ELSE")
-            {
-                if (Program.in_if_statement)
-                {
-                    Program.in_false_if_statement = !Program.in_false_if_statement;
-                }
-                else
-                    Program.Error(input_line, module, line_number, -1, "#ELSE Found not in #IF statement!");
-                return (Program.Statement)null;
-            }
-
-            // Do an IF check //
+            // #ELSE_IF check //
             if (output.instruction == "#ELSE_IF")
             {
-                if (Program.in_if_statement)
+                switch (Program.if_status)
                 {
-                    Program.in_if_statement = false;
-
-                    // Sets the SKIP_CODE value based on the label //
-                    Program.in_false_if_statement = Program.check_setting(output, input_line, line_number, module);
+                    case Program.IfStatus.not_in_if_block:
+                        Program.Error(input_line, module, line_number, -1, "#ELSE_IF Found not in #IF statement!");
+                        break;
+                    case Program.IfStatus.in_false_else_statement:
+                    case Program.IfStatus.in_true_else_statement:
+                        Program.Error(input_line, module, line_number, -1, "#ELSE_IF Found after an #ELSE statement!");
+                        break;
+                    case Program.IfStatus.in_true_if_statement:
+                        Program.if_status = Program.IfStatus.resolved_if_chain;
+                        break;
+                    case Program.IfStatus.in_false_if_statement:
+                        // Sets the if_status value based on the label //
+                        if (Program.CheckIfStatement(output, input_line, line_number, module))
+                            Program.if_status = Program.IfStatus.in_false_if_statement;
+                        else
+                            Program.if_status = Program.IfStatus.in_true_if_statement;
+                        break;
                 }
-                else
-                    Program.Error(input_line, module, line_number, -1, "#ELSE_IF Found not in #IF statement!");
                 return (Program.Statement)null;
             }
 
-            // If currently In a False If, bail //
-            if (Program.in_false_if_statement)
+            // #ELSE is just do the opposite //
+            if (output.instruction == "#ELSE")
+            {
+                if (output.tokens.Count > 0)
+                    Program.Error(input_line, module, line_number, -1, "Too many tokens for #ELSE statement!");
+                switch (Program.if_status)
+                {
+                    case Program.IfStatus.not_in_if_block:
+                        Program.Error(input_line, module, line_number, -1, "#ELSE Found not in #IF statement!");
+                        break;
+                    case Program.IfStatus.in_false_else_statement:
+                    case Program.IfStatus.in_true_else_statement:
+                        Program.Error(input_line, module, line_number, -1, "#ELSE Found after an #ELSE statement!");
+                        break;
+                    // #ELSE is just do the opposite //
+                    case Program.IfStatus.in_true_if_statement:
+                    case Program.IfStatus.resolved_if_chain:
+                        Program.if_status = Program.IfStatus.in_false_else_statement;
+                        break;
+                    case Program.IfStatus.in_false_if_statement:
+                        Program.if_status = Program.IfStatus.in_true_else_statement;
+                        break;
+                }
+
+                return (Program.Statement)null;
+            }
+
+            // Turn off the #IF flag //
+            if (output.instruction == "#END_IF")
+            {
+                if (output.tokens.Count > 0)
+                    Program.Error(input_line, module, line_number, -1, "Too many tokens for #END_IF statement!");
+                if (Program.if_status == Program.IfStatus.not_in_if_block)
+                    Program.Error(input_line, module, line_number, -1, "#END_IF Found not in #IF statement!");
+
+                Program.if_status = Program.IfStatus.not_in_if_block;
+                return (Program.Statement)null;
+            }
+
+            // If we are in any of the statuses that are false, skip this line //
+            if (Program.if_status == Program.IfStatus.in_false_if_statement || Program.if_status == Program.IfStatus.in_false_else_statement || Program.if_status == Program.IfStatus.resolved_if_chain)
             {
                 return (Program.Statement)null;
             }
@@ -2760,14 +2773,6 @@ namespace sh4_asm
             if (output.instruction == "#SET")
             {
                 Program.AddSetting(output, input_line, line_number, module);
-                return (Program.Statement)null;
-            }
-
-            // Do a IF / NOT_IF check //
-            if (output.instruction == "#IF" || output.instruction == "#NOT_IF")
-            {
-                // Sets the SKIP_CODE value based on the label //
-                Program.in_false_if_statement = Program.check_setting(output, input_line, line_number, module);
                 return (Program.Statement)null;
             }
 
@@ -3072,7 +3077,7 @@ namespace sh4_asm
 
             string label = statement.tokens[0].raw_string.ToUpper();
             string sValue = statement.tokens[1].raw_string.ToUpper();
-            string padding = new string(' ', label.Length < 20 ? 20-label.Length : 0);
+            string padding = new string(' ', label.Length < 20 ? 20 - label.Length : 0);
             long value;
 
             // Convert the string to the value //
@@ -3101,13 +3106,13 @@ namespace sh4_asm
                 if (setting_dict[label] != value)
                 {
                     setting_dict[label] = value;
-                    System.Console.WriteLine($"[u] UPDATING SETTING: {label}\n +-------> [v] VALUE: {value}\n");
+                    System.Console.WriteLine($"UPDATE SETTING: {label}{padding} VALUE: {sValue}");
                 }
             }
             else
             {
                 setting_dict.Add(label, value);
-                System.Console.WriteLine($"[s] USING SETTING: {label}\n +----> [v] VALUE: {value}\n");
+                System.Console.WriteLine($" USING SETTING: {label}{padding} VALUE: {sValue}");
             }
 
             return;
@@ -3115,7 +3120,7 @@ namespace sh4_asm
 
         // Check if the IF/NOT_IF value is set, returns the value for the 'in_false_if_statement' program flag //
         // Should be in this format #IF [#AND/#OR/#NOT] LABEL_1 LABEL_2 0x03 LABEL_3 ...
-        private static bool check_setting(
+        private static bool CheckIfStatement(
             Program.Statement statement,
               char[] input_line,
               int line_number,
@@ -3132,15 +3137,9 @@ namespace sh4_asm
             int settingsFound = 0;
             string nextLabel;
 
-            // Check if we are current in an IF //
-            if (Program.in_if_statement)
-                Program.Error(input_line, module, line_number, -1, "CHECK IF: NESTED IF STATEMENTS ARE NOT SUPPORTED");
-
             if (numTokens == 0)
                 Program.Error(input_line, module, line_number, -1, "CHECK IF: MISSING TOKEN");
 
-
-            Program.in_if_statement = true;
             for (x = 0; x < numTokens; x++)
             {
                 label = statement.tokens[x].raw_string.ToUpper();
@@ -3157,6 +3156,9 @@ namespace sh4_asm
 
             if (orCheck && andCheck)
                 Program.Error(input_line, module, line_number, -1, "CHECK IF: #AND not compatible with #OR");
+
+            if (settingsFound > 1 && !orCheck && !andCheck)
+                Program.Error(input_line, module, line_number, -1, $"CHECK IF: Too many settings ");
 
             if (settingsFound == 0)
                 Program.Error(input_line, module, line_number, -1, $"CHECK IF: No settings found in line '{line}'");
@@ -3662,7 +3664,7 @@ namespace sh4_asm
                     Program.Error(input_line, module, line_number, index, "Invalid label \"" + token.raw_string + "\"");
 
                 // Don't add the symbol if we are are skip mode //
-                if (!Program.in_false_if_statement)
+                if (Program.if_status != Program.IfStatus.in_false_if_statement && Program.if_status != Program.IfStatus.in_false_else_statement && Program.if_status != Program.IfStatus.resolved_if_chain)
                 {
                     Program.add_symbol(token.raw_string, (long)statement_number, Program.SymbolType.label, input_line, line_number, index, statement_number, 4U, module);
                 }
@@ -3989,6 +3991,16 @@ namespace sh4_asm
         {
             Little,
             Big,
+        }
+
+        private enum IfStatus
+        {
+            not_in_if_block,
+            resolved_if_chain,
+            in_false_if_statement,
+            in_true_if_statement,
+            in_false_else_statement,
+            in_true_else_statement,
         }
     }
 }
