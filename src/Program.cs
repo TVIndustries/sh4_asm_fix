@@ -258,11 +258,11 @@ namespace sh4_asm
                     break;
                 case "BRA":
                     if (Program.check_arguments(statement, Program.ParseType.absolute_displacement_address))
-                        return (long)(Program.calculate_pc_displacement(statement, 2, -4096, 4094) * 2) + (long)statement.address + 4L;
+                        return (long)(Program.calculate_pc_displacement(statement, 2, -2048, 2047) * 2) + (long)statement.address + 4L;
                     break;
                 case "BSR":
                     if (Program.check_arguments(statement, Program.ParseType.absolute_displacement_address))
-                        return (long)(Program.calculate_pc_displacement(statement, 2, -4096, 4094) * 2) + (long)statement.address + 4L;
+                        return (long)(Program.calculate_pc_displacement(statement, 2, -2048, 2047) * 2) + (long)statement.address + 4L;
                     break;
                 case "BT":
                     if (Program.check_arguments(statement, Program.ParseType.absolute_displacement_address))
@@ -1757,7 +1757,7 @@ namespace sh4_asm
                         {
                             num5 *= size;
                             num6 *= size;
-                            Program.Error(statement.raw_line, statement.module, statement.line_number, -1, "displacement argument \"" + (object)(short)statement.tokens[0].value + "\"  for " + statement.instruction + " too far, can only be between " + (object)num6 + " or +" + (object)num5 + " bytes away.\n Calculated displacement: " + (object)pcDisplacement);
+                            Program.Error(statement.raw_line, statement.module, statement.line_number, -1, " [i] Displacement argument \"" + (object)(short)statement.tokens[0].value + "\"  for " + statement.instruction + " too far, can only be between " + (object)num6 + " or +" + (object)num5 + " bytes away.\n [i] Calculated displacement: " + (object)pcDisplacement + "\n [i] Max backward distance: " + (object)min_base);
 
                         }
                     }
@@ -1834,8 +1834,8 @@ namespace sh4_asm
           Program.Statement statement,
           int size = 2)
         {
-            int pcDisplacement = Program.calculate_pc_displacement(statement, size, -4096, 4094);
-            return (ushort)((int)insn << 12 | (int)(ushort)pcDisplacement & 4095);
+            int pcDisplacement = Program.calculate_pc_displacement(statement, size, -2048, 2047);
+            return (ushort)((int)insn << 12 | (int)(pcDisplacement & 0x00FFFFFF));
         }
 
         private static ushort generate_fv_register_register(ushort insn, Program.Statement statement)
@@ -2280,6 +2280,20 @@ namespace sh4_asm
                             if (symbol.symbol_type == Program.SymbolType.from_symbol_directive || symbol.symbol_type == Program.SymbolType.label)
                             {
                                 num = symbol.size;
+
+                                if (statement.instruction == "#DATA16")
+                                {
+                                    num = 2U;
+                                }
+                                else if (statement.instruction == "#DATA8")
+                                {
+                                    num = 1U;
+
+                                }
+                                else
+                                {
+                                    num = symbol.size;
+                                }
                                 current_address += num;
                                 continue;
                             }
