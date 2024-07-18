@@ -1726,8 +1726,8 @@ namespace sh4_asm
             if (statement.tokens[0].parse_type == Program.ParseType.name || statement.tokens[0].inner_token != null && statement.tokens[0].inner_token.parse_type == Program.ParseType.name)
             {
 
-                if (statement.instruction == "BSR")
-                    Console.WriteLine(statement.raw_line);
+                //if (statement.instruction == "BSR")
+                //    Console.WriteLine(statement.raw_line);
                 long address = (long)statement.address;
                 long num2 = (long)(uint)statement.tokens[0].value;
                 if (size == 4)
