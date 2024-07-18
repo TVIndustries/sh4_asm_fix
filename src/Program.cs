@@ -249,12 +249,12 @@ namespace sh4_asm
             {
                 case "BF":
                     if (Program.check_arguments(statement, Program.ParseType.absolute_displacement_address))
-                        return (long)(Program.calculate_pc_displacement(statement, 2, -0xFF, 0x7F) * 2) + (long)statement.address + 4L;
+                        return (long)(Program.calculate_pc_displacement(statement, 2, -128, 127) * 2) + (long)statement.address + 4L;
                     break;
                 case "BF.S":
                 case "BF/S":
                     if (Program.check_arguments(statement, Program.ParseType.absolute_displacement_address))
-                        return (long)(Program.calculate_pc_displacement(statement, 2, -256, 254) * 2) + (long)statement.address + 4L;
+                        return (long)(Program.calculate_pc_displacement(statement, 2, -128, 127) * 2) + (long)statement.address + 4L;
                     break;
                 case "BRA":
                     if (Program.check_arguments(statement, Program.ParseType.absolute_displacement_address))
@@ -266,24 +266,25 @@ namespace sh4_asm
                     break;
                 case "BT":
                     if (Program.check_arguments(statement, Program.ParseType.absolute_displacement_address))
-                        return (long)(Program.calculate_pc_displacement(statement, 2, -256, 254) * 2) + (long)statement.address + 4L;
+                        return (long)(Program.calculate_pc_displacement(statement, 2, -128, 127) * 2) + (long)statement.address + 4L;
                     break;
                 case "BT.S":
                 case "BT/S":
                     if (Program.check_arguments(statement, Program.ParseType.absolute_displacement_address))
-                        return (long)(Program.calculate_pc_displacement(statement, 2, -256, 254) * 2) + (long)statement.address + 4L;
+                        return (long)(Program.calculate_pc_displacement(statement, 2, -128, 127) * 2) + (long)statement.address + 4L;
                     break;
                 case "MOV.L":
                     if (Program.check_arguments(statement, Program.ParseType.pc_displacement, Program.ParseType.register_direct) && statement.tokens[0].inner_token.parse_type != Program.ParseType.name)
-                        return (long)(Program.calculate_pc_displacement(statement, 4, -256, 254) * 4) + (long)statement.address + 4L & 4294967292L;
+                        return (long)(Program.calculate_pc_displacement(statement, 4, 0, 255) * 4) + (long)statement.address + 4L & 0xFFFFFFFC;
+                        
                     break;
                 case "MOV.W":
                     if (Program.check_arguments(statement, Program.ParseType.pc_displacement, Program.ParseType.register_direct) && statement.tokens[0].inner_token.parse_type != Program.ParseType.name)
-                        return (long)(Program.calculate_pc_displacement(statement, 2, 0, 0xFF) * 2) + (long)statement.address + 4L;
+                        return (long)(Program.calculate_pc_displacement(statement, 2, 0, 255) * 2) + (long)statement.address + 4L;
                     break;
                 case "MOVA":
                     if (Program.check_arguments(statement, Program.ParseType.pc_displacement, Program.ParseType.register_direct) && statement.tokens[0].inner_token.parse_type != Program.ParseType.name)
-                        return (long)(Program.calculate_pc_displacement(statement, 4, -256, 254) * 4) + (long)statement.address + 4L & 4294967292L;
+                        return (long)(Program.calculate_pc_displacement(statement, 4, 0, 255) * 4) + (long)statement.address + 4L & 0xFFFFFFFC;
                     break;
                 default:
                     return -1;
@@ -1724,23 +1725,26 @@ namespace sh4_asm
             int num6 = min_base;
             if (statement.tokens[0].parse_type == Program.ParseType.name || statement.tokens[0].inner_token != null && statement.tokens[0].inner_token.parse_type == Program.ParseType.name)
             {
-                //Console.WriteLine("first");
+
+                if (statement.instruction == "BSR")
+                    Console.WriteLine(statement.raw_line);
                 long address = (long)statement.address;
                 long num2 = (long)(uint)statement.tokens[0].value;
                 if (size == 4)
                 {
-                    //Console.WriteLine("size is 4");
-                    pcDisplacement = (num2 - address - 2L & 4294967292L) / (long)size;
+                    //    if (statement.instruction == "BSR")
+                    //    Console.WriteLine("size is 4");
+                    pcDisplacement = (num2 - address - 2L & 0xFFFFFFFC) / (long)size;
                     num1 = 0;
                 }
                 else
                 {
-
-                    //Console.WriteLine("size not 4");
+                    //    if (statement.instruction == "BSR")
+                    //        Console.WriteLine("size not 4");
 
 
                     num1 = (int)((num2 - address - 4L) % (long)size);
-                    pcDisplacement = (num2 - address - 4L) / (long)size;
+                    pcDisplacement = (int)((num2 - address - 4L) / (long)size);
                     if (num2 > address)
                     {
                         if (pcDisplacement > max_base)
@@ -1762,13 +1766,6 @@ namespace sh4_asm
                         }
                     }
 
-                    /*
-                    if(pcDisplacement > 127*2 || pcDisplacement < 128*-2)
-                    {
-                      Console.WriteLine("calculate_pc_displacement - pcDisplacement is:");
-                      Console.WriteLine(pcDisplacement);
-                    }
-                    //*/
                 }
             }
             else if (statement.tokens[0].parse_type == Program.ParseType.absolute_displacement_address)
@@ -1779,7 +1776,7 @@ namespace sh4_asm
                 if (size == 4)
                 {
                     //Console.WriteLine("2nd size 4");
-                    pcDisplacement = (num3 - address - 2L & 4294967292L) / (long)size;
+                    pcDisplacement = (num3 - address - 2L & 0xFFFFFFFC) / (long)size;
                     num1 = 0;
                 }
                 else
@@ -1791,16 +1788,20 @@ namespace sh4_asm
             }
             else
             {
-                //Console.WriteLine("else");
+                // Console.WriteLine("else");
                 long num4 = statement.tokens[0].value;
                 num1 = (int)num4 % size;
-                pcDisplacement = size != 4 ? num4 / (long)size : (num4 & 4294967292L) / (long)size;
-            }
+                pcDisplacement = size != 4 ? num4 / (long)size : (num4 & 0xFFFFFFFC) / (long)size;
 
-            num5 = max_base * size;
-            num6 = min_base * size;
+            }
+            //if (statement.instruction == "BSR")
+            //    Console.WriteLine("[i] calculate_pc_displacement - pcDisplacement is: " + pcDisplacement + "\n [i] Max forward distance: " + (object)max_base + "\n [i] Max backward distance: " + (object)min_base);
+ 
+            num5 = max_base;
+            num6 = min_base;
             if (num1 != 0)
                 Program.Error(statement.raw_line, statement.module, statement.line_number, -1, "displacement argument \"" + (object)pcDisplacement + "\"  for " + statement.instruction + " must be " + (object)size + "-aligned (add or remove #data padding somewhere probably?)");
+
             if (pcDisplacement > (long)num5 || pcDisplacement < (long)num6)
                 Program.Error(statement.raw_line, statement.module, statement.line_number, -1, "displacement argument \"" + (object)(short)statement.tokens[0].value + "\"  for " + statement.instruction + " too far, can only be between " + (object)num6 + " or +" + (object)num5 + " bytes away");
             return (int)pcDisplacement;
@@ -1814,7 +1815,9 @@ namespace sh4_asm
             short pcDisplacement;
             //Console.WriteLine("generate_pc_displacement8");
             if (statement.instruction == "MOV.W")
-                pcDisplacement = (short)Program.calculate_pc_displacement(statement, size, 0, 0xFF); //-256 and 254 are wrong, mixing instr/displ with bytes?
+                pcDisplacement = (short)Program.calculate_pc_displacement(statement, size, 0, 255); //-256 and 254 are wrong, mixing instr/displ with bytes?
+            else if (statement.instruction == "MOV.L" || statement.instruction == "MOVA")
+                pcDisplacement = (short)Program.calculate_pc_displacement(statement, size, 0, 255); //-256 and 254 are wrong, mixing instr/displ with bytes?
             else
                 pcDisplacement = (short)Program.calculate_pc_displacement(statement, size, -128, 127); //-256 and 254 are wrong, mixing instr/displ with bytes?
             return (ushort)((int)insn << 8 | (int)(ushort)pcDisplacement & (int)byte.MaxValue);
@@ -1835,7 +1838,8 @@ namespace sh4_asm
           int size = 2)
         {
             int pcDisplacement = Program.calculate_pc_displacement(statement, size, -2048, 2047);
-            return (ushort)((int)insn << 12 | (int)(pcDisplacement & 0x00FFFFFF));
+            // short instruction_op_code = (ushort)((int)(insn << 12) | (int)(pcDisplacement & 0x0FFF));
+            return (ushort)((int)(insn << 12) | (int)(pcDisplacement & 0x0FFF));
         }
 
         private static ushort generate_fv_register_register(ushort insn, Program.Statement statement)
